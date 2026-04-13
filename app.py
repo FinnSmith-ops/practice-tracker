@@ -1,15 +1,16 @@
 from flask import Flask, request
 from flask import render_template
 import sqlite3
-
+import os
 from flask import session
 
 
 
 
+DB_PATH = os.environ.get("DB_PATH", "database.db")
 
 app= Flask(__name__)
-app.secret_key='key'
+app.secret_key='110Pauldrive!'
 @app.route("/login")
 def login():
     return render_template("login_form.html")
@@ -17,7 +18,7 @@ def login():
 def logged_in():
     Username = request.form["Username"]
     Password = request.form["Password"]
-    connection = sqlite3.connect(r"c:\Users\finns\OneDrive\Documents\SQLite\Flask_music.db")
+    connection = sqlite3.connect(DB_PATH)
     cursor = connection.cursor()
     sql = 'select User_ID from user_info where Username=? and Password=?'
     cursor.execute(sql, (Username, Password))
@@ -37,7 +38,7 @@ def registration():
 def register():
     Username = request.form["Username"]
     Password = request.form["Password"]
-    connection = sqlite3.connect(r"c:\Users\finns\OneDrive\Documents\SQLite\Flask_music.db")
+    connection = sqlite3.connect(DB_PATH)
     cursor = connection.cursor()
     sql = 'create table if not exists User_info(User_ID INTEGER PRIMARY KEY AUTOINCREMENT, Username varchar(50) not null, Password varchar(20) not null)'
     cursor.execute(sql)
@@ -74,7 +75,7 @@ def goal():
     time = request.form["time"]
     date = request.form["date"]
 
-    connection = sqlite3.connect(r"c:\Users\finns\OneDrive\Documents\SQLite\Flask_Music.db")
+    connection = sqlite3.connect(DB_PATH)
     cursor = connection.cursor()
     sql = 'create table if not exists User_Goals(User_ID INT not null, song varchar(50) not null, date varchar(20) not null, time varchar(20) not null, foreign key(User_ID) references users(User_ID))'
     cursor.execute(sql)
@@ -105,7 +106,7 @@ def show_song():
     date = request.form["date"]
     time = request.form["time"]
 
-    connection = sqlite3.connect(r"c:\Users\finns\OneDrive\Documents\SQLite\Flask_Music.db")
+    connection = sqlite3.connect(DB_PATH)
     cursor = connection.cursor()
     sql = 'create table if not exists User_Songs(User_ID INT not null, song varchar(50) not null, date varchar(20) not null, time varchar(20) not null, foreign key(User_ID) references users(User_ID))'
     cursor.execute(sql)
@@ -120,7 +121,7 @@ def show_song():
 
 @app.route("/all_songs")
 def all_songs():
-    connection = sqlite3.connect(r"c:\Users\finns\OneDrive\Documents\SQLite\Flask_Music.db")
+    connection = sqlite3.connect(DB_PATH)
     cursor = connection.cursor()
     sql = 'select song, SUM(time) from User_Songs where User_ID = ? Group by song'
     cursor.execute(sql, (session.get("User_ID"),))
@@ -133,12 +134,19 @@ def all_songs():
 def see_goal(): 
     if session.get("User_ID") == None:
         return render_template("not_logged_in.html")
-    connection = sqlite3.connect(r"c:\Users\finns\OneDrive\Documents\SQLite\Flask_Music.db")
+    connection = sqlite3.connect(DB_PATH)
     cursor = connection.cursor()
     sql = 'select * from User_Songs x join User_goals y on x.User_ID=y.User_ID and x.song = y.song where x.User_ID = ? '
 
     cursor.execute(sql, (session.get("User_ID"),))
     data = cursor.fetchall()
+    if not data:
+        return render_template(
+            "show_goal.html",
+            goals=[],
+            goal_percents=[],
+            song_names=[]
+        )
     print(data)
 
     time = 0
@@ -147,7 +155,7 @@ def see_goal():
     goals = []
     song = data[0][1]
     
-    # percent_to_goal = (int(total_time/60))/int(goal)
+    
     for i in range(len(data)):
         new_song = data[i][1]
         if i == len(data)-1:
