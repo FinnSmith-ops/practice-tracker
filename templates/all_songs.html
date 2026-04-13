@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link rel="stylesheet" href="{{url_for('static', filename='stle.css')}}">
+</head>
+<body>
+    <ol>
+        {% for i in range(quant) %}
+            <li>You have practiced {{ data[i][0] }} for {{ data[i][1] }} minutes.</li>
+        {% endfor %}
+    </ol>
+    <input type="button" onclick ="window.location.href='/'" value="Home Page">
+</body>
+</html>

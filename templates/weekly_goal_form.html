@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{url_for('static', filename='stle.css')}}">
+    <title>Document</title>
+</head>
+<body>
+    <form method="POST" action="/goals">
+        <label>Insert Song</label>
+        <input type="text" placeholder="Song Name" name="song" required>
+        <br>
+        <label>Insert Date</label>
+        <input type="text" placeholder="(MM/DD/YYYY)" maxlength=10 minlength=10 name="date" name="date" required>
+        <input type="submit">
+    </form>
+</body>
+</html>

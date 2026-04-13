@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{url_for('static', filename='stle.css')}}">
+    <title>Document</title>
+</head>
+<body>
+    <ol> 
+        {% for i in range(song_names | length) %}      
+            <li>You are {{ goal_percents[i] }}% to your goal of {{ goals[i] }} hours this week on {{ song_names[i] }}! </li>
+        {% endfor %}
+    </ol>
+    <input type="button" value="Home Page" onclick = "window.location.href='/'">
+</body>
+</html>
