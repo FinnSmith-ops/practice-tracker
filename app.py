@@ -1,197 +1,265 @@
-from flask import Flask, request
-from flask import render_template
+from flask import Flask, request, render_template, session
 import sqlite3
-import os
-from flask import session
 
+app = Flask(__name__)
+app.secret_key = "devkey"
 
+DB_PATH = "database.db"
 
+def get_db():
+    return sqlite3.connect(DB_PATH)
 
-DB_PATH = os.environ.get("DB_PATH", "database.db")
-
-app= Flask(__name__)
-app.secret_key='110Pauldrive!'
-@app.route("/login")
-def login():
-    return render_template("login_form.html")
-@app.route("/logged_in", methods=["POST", "GET"])
-def logged_in():
-    Username = request.form["Username"]
-    Password = request.form["Password"]
-    connection = sqlite3.connect(DB_PATH)
-    cursor = connection.cursor()
-    sql = 'select User_ID from user_info where Username=? and Password=?'
-    cursor.execute(sql, (Username, Password))
-    result = cursor.fetchone()
-    if result == None:
-        return render_template("bad_login.html")
-    if result:
-        session["User_ID"] = result[0]
-    connection.commit()
-    connection.close()
-    return render_template("good_login.html")
-@app.route("/registration", methods=["POST", "GET"])
-def registration():
-    return render_template("registration_form.html")
-
-@app.route("/registered", methods=["POST", "GET"])
-def register():
-    Username = request.form["Username"]
-    Password = request.form["Password"]
-    connection = sqlite3.connect(DB_PATH)
-    cursor = connection.cursor()
-    sql = 'create table if not exists User_info(User_ID INTEGER PRIMARY KEY AUTOINCREMENT, Username varchar(50) not null, Password varchar(20) not null)'
-    cursor.execute(sql)
-    sql = 'insert into User_info(Username, Password) values(?, ?)' 
-    try:
-        cursor.execute(sql, (Username, Password))
-    except sqlite3.IntegrityError:
-        return render_template("username_taken.html")
-    sql='select User_ID from User_info where Username=? and Password=?'
-    cursor.execute(sql, (Username, Password))
-    result = cursor.fetchone()
-    if result:
-        session["User_ID"] = result[0]
-    connection.commit()
-    connection.close()
-
-    return render_template("good_login.html")
 @app.route("/")
 def index():
     return render_template("hello.html")
 
-@app.route("/add_song", methods = ["GET", "POST"])
+@app.route("/login")
+def login():
+    return render_template("login_form.html")
+
+@app.route("/logged_in", methods=["POST"])
+def logged_in():
+    Username = request.form["Username"]
+    Password = request.form["Password"]
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS User_info(
+            User_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+            Username TEXT NOT NULL UNIQUE,
+            Password TEXT NOT NULL
+        )
+    """)
+
+    cursor.execute(
+        "SELECT User_ID FROM User_info WHERE Username=? AND Password=?",
+        (Username, Password),
+    )
+
+    result = cursor.fetchone()
+    conn.close()
+
+    if result is None:
+        return render_template("bad_login.html")
+
+    session["User_ID"] = result[0]
+    return render_template("good_login.html")
+
+@app.route("/registration")
+def registration():
+    return render_template("registration_form.html")
+
+@app.route("/registered", methods=["POST"])
+def register():
+    Username = request.form["Username"]
+    Password = request.form["Password"]
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS User_info(
+            User_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+            Username TEXT NOT NULL UNIQUE,
+            Password TEXT NOT NULL
+        )
+    """)
+
+    try:
+        cursor.execute(
+            "INSERT INTO User_info (Username, Password) VALUES (?, ?)",
+            (Username, Password),
+        )
+    except sqlite3.IntegrityError:
+        conn.close()
+        return render_template("username_taken.html")
+
+    cursor.execute(
+        "SELECT User_ID FROM User_info WHERE Username=? AND Password=?",
+        (Username, Password),
+    )
+    result = cursor.fetchone()
+
+    conn.commit()
+    conn.close()
+
+    session["User_ID"] = result[0]
+    return render_template("good_login.html")
+
+@app.route("/add_song")
 def add_song():
-    return render_template('add_song.html') 
+    return render_template("add_song.html")
 
 @app.route("/add_goal")
-def add_goal(): 
+def add_goal():
     return render_template("add_goal.html")
 
-
-@app.route("/goal", methods = ["POST"]) 
-def goal():   
-    song = request.form["song"]
-    time = request.form["time"]
-    date = request.form["date"]
-
-    connection = sqlite3.connect(DB_PATH)
-    cursor = connection.cursor()
-    sql = 'create table if not exists User_Goals(User_ID INT not null, song varchar(50) not null, date varchar(20) not null, time varchar(20) not null, foreign key(User_ID) references users(User_ID))'
-    cursor.execute(sql)
-    sql = 'select song from User_goals'
-    cursor.execute(sql)
-    songs = cursor.fetchall()
-    final = []
-    print(len(songs))
-    for i in range(len(songs)):
-        if songs[i][0] == song:
-            final.append(song)
-
-    if song in final:
-        return render_template('already_goal.html')
-    sql = 'insert into User_Goals(User_ID, song, date, time) values(?, ?, ?, ?)'
-    try: 
-        cursor.execute(sql, (session.get("User_ID"), song, date, time))
-    except sqlite3.IntegrityError:
+@app.route("/song", methods=["POST"])
+def show_song():
+    if not session.get("User_ID"):
         return render_template("not_logged_in.html")
-    connection.commit()
-    connection.close()
+
+    song = request.form["song"].strip()
+    date = request.form["date"]
+    time = int(request.form["time"])
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS User_Songs(
+            User_ID INT,
+            song TEXT,
+            date TEXT,
+            time INTEGER
+        )
+    """)
+
+    cursor.execute(
+        "INSERT INTO User_Songs VALUES (?, ?, ?, ?)",
+        (session["User_ID"], song, date, time),
+    )
+
+    conn.commit()
+    conn.close()
+
     return render_template("home.html")
 
-@app.route("/song", methods = ["POST"])
-def show_song():
-    
-    song = request.form["song"]
-    date = request.form["date"]
-    time = request.form["time"]
-
-    connection = sqlite3.connect(DB_PATH)
-    cursor = connection.cursor()
-    sql = 'create table if not exists User_Songs(User_ID INT not null, song varchar(50) not null, date varchar(20) not null, time varchar(20) not null, foreign key(User_ID) references users(User_ID))'
-    cursor.execute(sql)
-    sql = 'insert into User_Songs(User_ID, song, date, time) values(?, ?, ?, ?)' 
-    try:
-        cursor.execute(sql, (session.get("User_ID"), song, date, time))
-    except sqlite3.IntegrityError:
+@app.route("/goal", methods=["POST"])
+def goal():
+    if not session.get("User_ID"):
         return render_template("not_logged_in.html")
-    connection.commit()
-    connection.close()
+
+    song = request.form["song"].strip()
+    date = request.form["date"]
+    time = int(request.form["time"])
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS User_Goals(
+            User_ID INT,
+            song TEXT,
+            date TEXT,
+            time INTEGER
+        )
+    """)
+
+    cursor.execute(
+        "SELECT 1 FROM User_Goals WHERE User_ID=? AND song=?",
+        (session["User_ID"], song),
+    )
+
+    if cursor.fetchone():
+        conn.close()
+        return render_template("already_goal.html")
+
+    cursor.execute(
+        "INSERT INTO User_Goals VALUES (?, ?, ?, ?)",
+        (session["User_ID"], song, date, time),
+    )
+
+    conn.commit()
+    conn.close()
+
     return render_template("home.html")
 
 @app.route("/all_songs")
 def all_songs():
-    connection = sqlite3.connect(DB_PATH)
-    cursor = connection.cursor()
-    sql = 'select song, SUM(time) from User_Songs where User_ID = ? Group by song'
-    cursor.execute(sql, (session.get("User_ID"),))
+    if not session.get("User_ID"):
+        return render_template("not_logged_in.html")
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS User_Songs(
+            User_ID INT,
+            song TEXT,
+            date TEXT,
+            time INTEGER
+        )
+    """)
+
+    cursor.execute("""
+        SELECT song, SUM(time)
+        FROM User_Songs
+        WHERE User_ID=?
+        GROUP BY song
+    """, (session["User_ID"],))
+
     data = cursor.fetchall()
-    print(data)
-    quant = len(data)
-    return render_template("all_songs.html", quant = quant, data = data)
+    conn.close()
+
+    if not data:
+        return render_template("add_song.html")
+
+    return render_template("all_songs.html", quant=len(data), data=data)
 
 @app.route("/goals")
-def see_goal(): 
-    if session.get("User_ID") == None:
+def see_goal():
+    if not session.get("User_ID"):
         return render_template("not_logged_in.html")
-    connection = sqlite3.connect(DB_PATH)
-    cursor = connection.cursor()
-    sql = 'select * from User_Songs x join User_goals y on x.User_ID=y.User_ID and x.song = y.song where x.User_ID = ? '
 
-    cursor.execute(sql, (session.get("User_ID"),))
-    data = cursor.fetchall()
-    if not data:
-        return render_template(
-            "show_goal.html",
-            goals=[],
-            goal_percents=[],
-            song_names=[]
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS User_Songs(
+            User_ID INT,
+            song TEXT,
+            date TEXT,
+            time INTEGER
         )
-    print(data)
+    """)
 
-    time = 0
-    total_time=[]
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS User_Goals(
+            User_ID INT,
+            song TEXT,
+            date TEXT,
+            time INTEGER
+        )
+    """)
+
+    cursor.execute("""
+        SELECT g.song, IFNULL(SUM(s.time), 0), g.time
+        FROM User_Goals g
+        LEFT JOIN User_Songs s
+        ON g.User_ID = s.User_ID AND g.song = s.song
+        WHERE g.User_ID = ?
+        GROUP BY g.song
+    """, (session["User_ID"],))
+
+    data = cursor.fetchall()
+    conn.close()
+
+    if not data:
+        return render_template("add_goal.html")
+
     song_names = []
-    goals = []
-    song = data[0][1]
-    
-    
-    for i in range(len(data)):
-        new_song = data[i][1]
-        if i == len(data)-1:
-            song_names.append(song)
-            time+=data[i][3]
-            total_time.append(time)
-            goals.append(data[i][7])
-
-        if new_song == song:
-            
-            time += data[i][3]
-
-        else:
-            goals.append(data[i][7])
-            total_time.append(time)
-            time = 0
-            time += data[i][3]
-            song_names.append(song)
-            song = new_song
     goal_percents = []
-    
-    for i in total_time:
-        print(i)
-        goal_percents.append((i/60))
-    print(goal_percents)
-    for i in range(len(goal_percents)):
-        goal_percents[i] = round(((float(goal_percents[i]))/float(goals[i])*100), 2)
-    print(goals)
-    print(goal_percents)
-    print(song_names)     
-    print(total_time)
-    connection.commit()
-    connection.close()
-    return render_template("show_goal.html", goals = goals,  goal_percents = goal_percents, song_names = song_names)
+    goals = []
 
+    for song, total_time, goal_time in data:
+        total_time = int(total_time)
+        goal_time = int(goal_time)
 
-if __name__ == '__main__':
-    app.run()
+        percent = 0 if goal_time == 0 else round((total_time / goal_time) * 100, 2)
 
+        song_names.append(song)
+        goal_percents.append(percent)
+        goals.append(goal_time)
+
+    return render_template(
+        "show_goal.html",
+        goals=goals,
+        goal_percents=goal_percents,
+        song_names=song_names
+    )
+
+if __name__ == "__main__":
+    app.run(debug=True)
