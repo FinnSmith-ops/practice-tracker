@@ -247,8 +247,9 @@ def see_goal():
     for song, total_time, goal_time in data:
         total_time = int(total_time)
         goal_time = int(goal_time)
-
-        percent = 0 if goal_time == 0 else round((total_time / goal_time*60) * 100, 2)
+        print(goal_time)
+        print(total_time)
+        percent = 0 if goal_time == 0 else round((total_time / (goal_time*60)) * 100, 2)
 
         song_names.append(song)
         goal_percents.append(percent)
